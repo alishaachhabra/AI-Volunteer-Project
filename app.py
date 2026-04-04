@@ -1,9 +1,9 @@
 import streamlit as st
 import requests
 import pandas as pd
-
+import os
 # ---------------- Configuration ----------------
-API_KEY = "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"   # Replace with your OpenRouter key
+API_KEY=os.getenv("API_KEY")
 DATA_FILE = "AI csv .xlsx"
 
 # Load dataset once
@@ -83,7 +83,7 @@ def dataset_search(user_input):
 
 
 def smart_search(user_input):
-    question_words = ["what", "why", "how", "who", "when", "define", "is"]
+    question_words = ["what", "why", "how", "who", "when", "define", "is", "are", "suggest", "do", "which", "find", "does", "can", "list", "will", "any"]
     ai_answer = None
     dataset_result = None
 
