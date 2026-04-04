@@ -1,8 +1,9 @@
 import streamlit as st
 import requests
 import pandas as pd
+import os
 
-API_KEY = "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"
+API_KEY = os.getenv("API_KEY")
 data = pd.read_excel("AI csv .xlsx")
 
 def call_ai(user_input, model="openai/gpt-3.5-turbo", system_prompt="You help users find NGOs and explain volunteering in simple terms."):
@@ -58,7 +59,7 @@ def dataset_search(user_input):
     return None
 
 def smart_search(user_input):
-    question_words = ["what", "why", "how", "who", "when", "define", "is"]
+    question_words = ["what", "why", "how", "who", "when", "define", "is", "suggest", "does", "can", "are", "i", "find", "will", "do", "list", "show", "suggest", "help"]
     if any(word in user_input.lower() for word in question_words):
         return {"type": "ai", "content": call_ai(user_input, model="openai/gpt-4o-mini")}
     else:
