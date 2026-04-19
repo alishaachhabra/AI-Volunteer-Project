@@ -2,167 +2,251 @@ import streamlit as st
 import requests
 import pandas as pd
 import os
-# ---------------- Configuration ----------------
-API_KEY=os.getenv("API_KEY")
+from transformers import pipeline
+from gtts import gTTS
+import tempfile
+import folium
+from streamlit_folium import st_folium
+
+# ---------------- UI DESIGN ----------------
+st.set_page_config(page_title="AI Volunteer Impact Platform", page_icon="🌍", layout="wide")
+
+st.markdown("""
+<style>
+
+/* Background */
+.stApp {
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: white;
+}
+
+/* Glass container */
+.block-container {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 30px;
+    border-radius: 20px;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: rgba(0,0,0,0.6);
+}
+
+/* Input */
+.stTextInput input {
+    background-color: rgba(255,255,255,0.1);
+    color: white;
+}
+
+/* Button */
+.stButton button {
+    background: linear-gradient(90deg, #ff6a88, #ff99ac);
+    color: white;
+}
+
+/* Cards */
+.card {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- CONFIG ----------------
+API_KEY = os.getenv("API_KEY")
 DATA_FILE = "AI csv .xlsx"
 
-# Load dataset once
+# ---------------- LOAD ----------------
 data = pd.read_excel(DATA_FILE)
+sentiment_analyzer = pipeline("sentiment-analysis")
 
-# ---------------- Helper Functions ----------------
-def call_ai(user_input,
-            model="openai/gpt-4o-mini",
-            system_prompt="You help users find NGOs and volunteer opportunities."):
+# ---------------- VOICE ----------------
+def speak_text(text):
+    tts = gTTS(text)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    tts.save(tmp.name)
+    return tmp.name
+
+# ---------------- AI ----------------
+def call_ai(user_input):
+    if not API_KEY:
+        return "⚠️ API Key missing"
+
     url = "https://openrouter.ai/api/v1/chat/completions"
-
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
-    data_api = {
-        "model": model,
+
+    body = {
+        "model": "openai/gpt-4o-mini",
         "messages": [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": "You help users find NGOs and explain volunteering."},
             {"role": "user", "content": user_input}
         ]
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data_api)
-        resp_json = response.json()
-        print("OpenRouter raw response:", resp_json)  # Debugging
+        res = requests.post(url, headers=headers, json=body)
+        result = res.json()
 
-        # Case 1: Normal success
-        if "choices" in resp_json and len(resp_json["choices"]) > 0:
-            return resp_json["choices"][0]["message"]["content"]
+        if "choices" in result:
+            return result["choices"][0]["message"]["content"]
+        return "⚠️ AI error"
+    except Exception as e:
+        return str(e)
 
-        # Case 2: Error returned
-        elif "error" in resp_json:
-            return f"⚠️ AI Error: {resp_json['error'].get('message', 'Unknown error')}"
+# ---------------- EMOTION ----------------
+def detect_emotion(text):
+    return sentiment_analyzer(text)[0]['label']
 
-        # Case 3: Unexpected format
-        else:
-            return f"⚠️ AI Error: Unexpected response format → {resp_json}"
+# ---------------- DATASET SEARCH ----------------
+def dataset_search(user_input):
+    result = data.copy()
+    txt = user_input.lower()
+
+    if "delhi" in txt:
+        result = result[result["Location"].str.contains("Delhi", case=False)]
+    if "noida" in txt:
+        result = result[result["Location"].str.contains("Noida", case=False)]
+    if "gurgaon" in txt:
+        result = result[result["Location"].str.contains("Gurgaon", case=False)]
+
+    if "education" in txt:
+        result = result[result["Work"].str.contains("Education", case=False)]
+    if "health" in txt:
+        result = result[result["Work"].str.contains("Healthcare", case=False)]
+
+    return result if not result.empty else None
+
+# ---------------- SMART ----------------
+def smart_search(user_input):
+    if any(w in user_input.lower() for w in ["what","why","how"]):
+        return {"ai": call_ai(user_input), "dataset": None}
+
+    ds = dataset_search(user_input)
+    if ds is not None:
+        return {"ai": None, "dataset": ds}
+
+    return {"ai": call_ai(user_input), "dataset": None}
+
+# ---------------- MAP ----------------
+def show_map(df):
+    if df is None or df.empty:
+        return
+
+    if "Latitude" not in df.columns or "Longitude" not in df.columns:
+        st.warning("Latitude/Longitude missing")
+        return
+
+    m = folium.Map(location=[28.61,77.23], zoom_start=6)
+
+    for _, row in df.iterrows():
+        try:
+            folium.Marker(
+                [float(row["Latitude"]), float(row["Longitude"])],
+                popup=row.get("NGO","NGO")
+            ).add_to(m)
+        except:
+            continue
+
+    st.subheader("🌍 NGO Map")
+    st_folium(m, width=700, height=500)
+
+# ---------------- IMAGE ----------------
+def generate_image(prompt):
+    try:
+        query = prompt.replace(" ", "+")
+        image_url = f"https://loremflickr.com/800/400/{query}"
+
+        st.image(image_url, caption="🎨 AI Generated Image")
 
     except Exception as e:
-        return f"⚠️ AI Exception: {str(e)}"
+        st.error(f"Image error: {e}")
 
+# ---------------- HEADER ----------------
+st.markdown("""
+<h1 style='text-align:center;'>🌍 AI Volunteer Impact Platform</h1>
+<p style='text-align:center;'>AI + Voice + Emotion + Map + Image</p>
+""", unsafe_allow_html=True)
 
-
-
-def dataset_search(user_input):
-    user_input_lower = user_input.lower()
-    location, work, eligibility = None, None, None
-
-    if "delhi" in user_input_lower: location = "Delhi"
-    elif "noida" in user_input_lower: location = "Noida"
-    elif "gurgaon" in user_input_lower: location = "Gurgaon"
-
-    if "education" in user_input_lower: work = "Education"
-    elif "health" in user_input_lower: work = "Healthcare"
-    elif "environment" in user_input_lower: work = "Environment"
-    elif "women" in user_input_lower: work = "Women"
-    elif "tech" in user_input_lower: work = "Technology"
-    elif "mental" in user_input_lower: work = "Mental Health"
-
-    if "student" in user_input_lower: eligibility = "Students"
-    elif "anyone" in user_input_lower: eligibility = "Anyone"
-    elif "volunteer" in user_input_lower: eligibility = "Volunteers"
-
-    result = data.copy()
-    if location:
-        result = result[result["Location"].str.contains(location, case=False)]
-    if work:
-        result = result[result["Work"].str.contains(work, case=False)]
-    if eligibility:
-        result = result[result["Eligibility"].str.contains(eligibility, case=False)]
-
-    if not result.empty:
-        return result
-    return None
-
-
-def smart_search(user_input):
-    question_words = ["what", "why", "how", "who", "when", "define", "is", "are", "suggest", "do", "which", "find", "does", "can", "list", "will", "any"]
-    ai_answer = None
-    dataset_result = None
-
-    if any(word in user_input.lower() for word in question_words):
-        ai_answer = call_ai(user_input, model="openai/gpt-4o-mini")
-    else:
-        dataset_result = dataset_search(user_input)
-        if dataset_result is None:
-            ai_answer = call_ai(user_input, model="openai/gpt-4o-mini")
-
-    return {"ai": ai_answer, "dataset": dataset_result}
-
-
-def show_image_for_context(user_input):
-    if "education" in user_input.lower():
-        st.image("https://images.unsplash.com/photo-1588072432836-e10032774350", caption="Education NGO in action")
-    elif "health" in user_input.lower():
-        st.image("https://images.unsplash.com/photo-1588776814546-1c1e1d6d7f1b", caption="Healthcare NGO support")
-    elif "environment" in user_input.lower():
-        st.image("https://images.unsplash.com/photo-1508780709619-79562169bc64", caption="Volunteers protecting environment")
-    elif "women" in user_input.lower():
-        st.image("https://images.unsplash.com/photo-1524504388940-b1c1722653e1", caption="Women empowerment NGO")
-    elif "tech" in user_input.lower():
-        st.image("https://images.unsplash.com/photo-1519389950473-47ba0277781c", caption="Technology training NGO")
-    else:
-        st.image("https://images.unsplash.com/photo-1509099836639-18ba1795216d", caption="General volunteering")
-
-# ---------------- Streamlit UI ----------------
-st.set_page_config(page_title="AI Volunteer Impact Platform", page_icon="🌍", layout="centered")
-st.title("🌍 AI Volunteer Impact Platform")
-
-# Initialize history
+# ---------------- HISTORY ----------------
 if "history" not in st.session_state:
     st.session_state["history"] = []
 
-user_input = st.text_input("Ask your question:")
-mode = st.radio("Choose mode:", ["AI Explanation", "Dataset Search", "Smart Search"])
+# ---------------- INPUT ----------------
+col1, col2 = st.columns([3,1])
 
-def run_query(query, mode):
+with col1:
+    user_input = st.text_input("Ask your question:")
+
+with col2:
+    st.write("")
+    st.write("")
+    search_btn = st.button("🔍 Search")
+
+# ---------------- IMAGE BUTTON ----------------
+if st.button("🎨 Generate Image"):
+    if user_input:
+        generate_image(user_input)
+
+# ---------------- MODE ----------------
+mode = st.radio("Choose mode:", ["AI Explanation","Dataset Search","Smart Search"])
+
+st.markdown("---")
+
+# ---------------- MAIN ----------------
+def run_query(query):
+
+    emotion = detect_emotion(query)
+
+    if emotion == "NEGATIVE":
+        query += " suggest NGOs"
+        st.info("💡 Emotion detected → suggesting help")
+
     if mode == "AI Explanation":
-        ai_answer = call_ai(query, model="openai/gpt-4o-mini")
-        st.success(ai_answer)
-        show_image_for_context(query)
-        st.session_state["history"].append(("AI", query))
+        res = call_ai(query)
+        st.success(res)
+
+        audio = speak_text(res)
+        st.markdown("### 🔊 Listen to response")
+        st.audio(audio)
 
     elif mode == "Dataset Search":
-        result = dataset_search(query)
-        if result is not None:
-            st.dataframe(result)
-            csv = result.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download results as CSV", data=csv, file_name="ngo_results.csv", mime="text/csv")
-            st.session_state["history"].append(("Dataset", query))
+        res = dataset_search(query)
+
+        if res is not None:
+            st.dataframe(res)
+            show_map(res)
         else:
-            st.error("No matching NGOs found.")
+            st.error("No NGOs found")
 
     elif mode == "Smart Search":
-        response = smart_search(query)
-        tabs = st.tabs(["🤖 AI Explanation", "📊 Dataset Results"])
-        with tabs[0]:
-            if response["ai"]:
-                st.success(response["ai"])
-                show_image_for_context(query)
-            else:
-                st.warning("No AI explanation available.")
-        with tabs[1]:
-            if response["dataset"] is not None:
-                st.dataframe(response["dataset"])
-                csv = response["dataset"].to_csv(index=False).encode("utf-8")
-                st.download_button("⬇️ Download results as CSV", data=csv, file_name="ngo_results.csv", mime="text/csv")
-            else:
-                st.warning("No dataset results found.")
-        st.session_state["history"].append(("Smart", query))
+        res = smart_search(query)
 
-if st.button("Search") and user_input:
-    run_query(user_input, mode)
+        if res["ai"]:
+            st.success(res["ai"])
+            audio = speak_text(res["ai"])
+            st.audio(audio)
 
-# Sidebar history with clickable buttons
-st.sidebar.title("📜 Search History")
-for idx, entry in enumerate(st.session_state["history"]):
-    mode, query = entry
-    if st.sidebar.button(f"{mode}: {query}", key=f"history_{idx}"):
-        run_query(query, mode)
+        if res["dataset"] is not None:
+            st.dataframe(res["dataset"])
+            show_map(res["dataset"])
+
+# ---------------- BUTTON ----------------
+if search_btn and user_input:
+    st.session_state["history"].insert(0, f"{mode}: {user_input}")
+    st.session_state["history"] = st.session_state["history"][:10]
+    run_query(user_input)
+
+# ---------------- SIDEBAR ----------------
+st.sidebar.markdown("## 📜 Search History")
+
+if len(st.session_state["history"]) == 0:
+    st.sidebar.write("No searches yet")
+else:
+    for item in st.session_state["history"]:
+        st.sidebar.markdown(f"<div class='card'>{item}</div>", unsafe_allow_html=True)
