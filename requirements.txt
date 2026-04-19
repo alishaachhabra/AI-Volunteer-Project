@@ -2,3 +2,8 @@ streamlit
 pandas
 requests
 openpyxl
+transformers
+torch
+gtts
+folium
+streamlit-folium
