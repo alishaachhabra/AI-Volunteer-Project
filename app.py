@@ -330,6 +330,24 @@ if search_btn and user_input:
     st.session_state["last_mode"] = mode
     if "last_query" in st.session_state:
         run_query(st.session_state["last_query"])
+
+st.markdown("---")
+st.subheader("🙋 Volunteer Signup")
+
+name = st.text_input("Your Name")
+email = st.text_input("Email")
+interest = st.text_input("Interested NGO or Cause")
+
+if st.button("Submit"):
+    st.success("Thank you for your interest! We will contact you soon.")
+
+st.markdown("---")
+st.subheader("💬 Feedback")
+
+feedback = st.text_area("Your Feedback")
+
+if st.button("Submit Feedback"):
+    st.success("Thank you for your feedback!")
 # ---------------- SIDEBAR ----------------
 st.sidebar.markdown("## 📜 Search History")
 
@@ -338,3 +356,4 @@ if len(st.session_state["history"]) == 0:
 else:
     for item in st.session_state["history"]:
         st.sidebar.markdown(f"<div class='card'>{item}</div>", unsafe_allow_html=True)
+
