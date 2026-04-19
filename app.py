@@ -259,95 +259,126 @@ if "history" not in st.session_state:
 # ---------------- INPUT ----------------
 st.markdown('<div class="card">', unsafe_allow_html=True)
 
-col1, col2 = st.columns([4,1])
+with st.form("search_form"):
 
-with col1:
-    user_input = st.text_input("Ask your question:")
+    col1, col2 = st.columns([4,1])
 
-with col2:
-    st.write("")
-    st.write("")
-    search_btn = st.button("🔍 Search")
+    with col1:
+        user_input = st.text_input("Ask your question:")
+
+    with col2:
+        st.write("")
+        st.write("")
+        search_btn = st.form_submit_button("🔍 Search")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
+
 # ---------------- IMAGE BUTTON ----------------
-if st.button("🎨 Generate Image"):
+if st.button("🎨 Generate Image", key="img_btn"):
     if user_input:
         generate_image(user_input)
+
 
 # ---------------- MODE ----------------
 mode = st.radio("Choose mode:", ["AI Explanation","Dataset Search","Smart Search"])
 
 st.markdown("---")
 
+
 # ---------------- MAIN ----------------
-def run_query(query):
-    mode = st.session_state.get("last_mode", "AI Explanation")
+def run_query(query, mode):
 
     emotion = detect_emotion(query)
+
     if emotion == "NEGATIVE":
         query += " suggest NGOs"
         st.info("💡 Emotion detected → suggesting help")
 
     if mode == "AI Explanation":
         res = call_ai(query)
-        st.success(res)
 
-        audio = speak_text(res)
-        st.markdown("### 🔊 Listen to response")
-        st.audio(audio)
+        st.session_state["result"] = {"type": "ai", "data": res}
 
     elif mode == "Dataset Search":
         res = dataset_search(query)
 
-        if res is not None:
-            st.dataframe(res)
-            show_map(res)
-        else:
-            st.error("No NGOs found")
+        st.session_state["result"] = {"type": "dataset", "data": res}
 
     elif mode == "Smart Search":
         res = smart_search(query)
 
-        if res["ai"]:
-            st.success(res["ai"])
-            audio = speak_text(res["ai"])
-            st.audio(audio)
+        st.session_state["result"] = {"type": "smart", "data": res}
 
-        if res["dataset"] is not None:
-            st.dataframe(res["dataset"])
-            show_map(res["dataset"])
 
 # ---------------- BUTTON ----------------
 if search_btn and user_input:
+
     # Save history
     st.session_state["history"].insert(0, f"{mode}: {user_input}")
     st.session_state["history"] = st.session_state["history"][:10]
 
-    # Save query for persistence (IMPORTANT FIX)
+    # Save state
     st.session_state["last_query"] = user_input
     st.session_state["last_mode"] = mode
-    if "last_query" in st.session_state:
-        run_query(st.session_state["last_query"])
 
+    # Run query
+    run_query(user_input, mode)
+
+
+# ---------------- DISPLAY RESULT (PERSISTENT) ----------------
+if "result" in st.session_state:
+
+    result = st.session_state["result"]
+
+    if result["type"] == "ai":
+        st.success(result["data"])
+        audio = speak_text(result["data"])
+        st.markdown("### 🔊 Listen")
+        st.audio(audio)
+
+    elif result["type"] == "dataset":
+        if result["data"] is not None:
+            st.dataframe(result["data"])
+            show_map(result["data"])
+        else:
+            st.error("No NGOs found")
+
+    elif result["type"] == "smart":
+        data = result["data"]
+
+        if data["ai"]:
+            st.success(data["ai"])
+            audio = speak_text(data["ai"])
+            st.audio(audio)
+
+        if data["dataset"] is not None:
+            st.dataframe(data["dataset"])
+            show_map(data["dataset"])
+
+
+# ---------------- FORMS ----------------
 st.markdown("---")
+
 st.subheader("🙋 Volunteer Signup")
 
-name = st.text_input("Your Name")
-email = st.text_input("Email")
-interest = st.text_input("Interested NGO or Cause")
+name = st.text_input("Your Name", key="name")
+email = st.text_input("Email", key="email")
+interest = st.text_input("Interested NGO or Cause", key="interest")
 
-if st.button("Submit"):
+if st.button("Submit", key="signup_btn"):
     st.success("Thank you for your interest! We will contact you soon.")
 
 st.markdown("---")
+
 st.subheader("💬 Feedback")
 
-feedback = st.text_area("Your Feedback")
+feedback = st.text_area("Your Feedback", key="feedback")
 
-if st.button("Submit Feedback"):
+if st.button("Submit Feedback", key="feedback_btn"):
     st.success("Thank you for your feedback!")
+
+
 # ---------------- SIDEBAR ----------------
 st.sidebar.markdown("## 📜 Search History")
 
@@ -356,4 +387,3 @@ if len(st.session_state["history"]) == 0:
 else:
     for item in st.session_state["history"]:
         st.sidebar.markdown(f"<div class='card'>{item}</div>", unsafe_allow_html=True)
-
