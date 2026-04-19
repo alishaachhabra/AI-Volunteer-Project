@@ -10,50 +10,116 @@ from streamlit_folium import st_folium
 
 # ---------------- UI DESIGN ----------------
 st.set_page_config(page_title="AI Volunteer Impact Platform", page_icon="🌍", layout="wide")
-
 st.markdown("""
 <style>
 
-/* Background */
+/* 🌌 Background */
 .stApp {
     background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
     color: white;
 }
 
-/* Glass container */
+/* 📦 Main Container */
 .block-container {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 30px;
-    border-radius: 20px;
+    padding: 2rem 3rem;
+    background: rgba(255,255,255,0.05);
+    max-width: 1000px;
+    margin: auto;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0px 8px 30px rgba(0,0,0,0.3);
 }
 
-/* Sidebar */
+/* 📊 Sidebar */
 section[data-testid="stSidebar"] {
-    background: rgba(0,0,0,0.6);
+    background: linear-gradient(180deg, #0f2027, #203a43);
+    border-right: 1px solid rgba(255,255,255,0.1);
 }
 
-/* Input */
+/* 🔤 Headings */
+h1, h2, h3 {
+    color: white;
+    font-weight: 600;
+}
+
+/* 🧾 Input Box */
 .stTextInput input {
-    background-color: rgba(255,255,255,0.1);
-    color: white;
-}
-
-/* Button */
-.stButton button {
-    background: linear-gradient(90deg, #ff6a88, #ff99ac);
-    color: white;
-}
-
-/* Cards */
-.card {
     background: rgba(255,255,255,0.1);
-    padding: 10px;
-    border-radius: 10px;
-    margin-bottom: 8px;
+    color: white;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 12px;
+}
+
+/* 🔘 Buttons */
+.stButton button {
+    background: linear-gradient(90deg, #ff758c, #ff7eb3);
+    color: white;
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-weight: 600;
+    border: none;
+    transition: 0.3s;
+}
+
+.stButton button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 5px 15px rgba(255,118,140,0.4);
+}
+
+/* 📋 Cards (for history or NGO display) */
+.card {
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
+}
+
+/* 📊 Dataframe */
+[data-testid="stDataFrame"] {
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* 📢 Success box */
+.stSuccess {
+    background-color: rgba(0,255,150,0.1) !important;
+    border-left: 4px solid #00ff95;
+}
+
+/* ⚠ Error box */
+.stError {
+    background-color: rgba(255,0,0,0.1) !important;
+    border-left: 4px solid red;
+}
+
+/* 💡 Info box */
+.stInfo {
+    background-color: rgba(0,150,255,0.1) !important;
+    border-left: 4px solid #0096ff;
+}
+
+/* 🔊 Audio player spacing */
+audio {
+    margin-top: 10px;
+}
+
+/* ➖ Divider */
+hr {
+    border: none;
+    height: 1px;
+    background: rgba(255,255,255,0.2);
+    margin: 20px 0;
 }
 
 </style>
 """, unsafe_allow_html=True)
+
+
+
 
 # ---------------- CONFIG ----------------
 API_KEY = os.getenv("API_KEY")
@@ -169,8 +235,21 @@ def generate_image(prompt):
 
 # ---------------- HEADER ----------------
 st.markdown("""
-<h1 style='text-align:center;'>🌍 AI Volunteer Impact Platform</h1>
-<p style='text-align:center;'>AI + Voice + Emotion + Map + Image</p>
+<div style="
+    text-align:center;
+    padding:30px 20px;
+    margin: 20px auto;
+    max-width: 900px;
+    border-radius:18px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0px 10px 30px rgba(0,0,0,0.3);
+">
+    <h1 style="margin-bottom:8px;">🌍 AI Volunteer Impact Platform</h1>
+    <p style="font-size:15px; opacity:0.8;">
+        ✨ AI + Voice + Emotion + Map + Image — Smart NGO Discovery Platform
+    </p>
+</div>
 """, unsafe_allow_html=True)
 
 # ---------------- HISTORY ----------------
@@ -178,7 +257,9 @@ if "history" not in st.session_state:
     st.session_state["history"] = []
 
 # ---------------- INPUT ----------------
-col1, col2 = st.columns([3,1])
+st.markdown('<div class="card">', unsafe_allow_html=True)
+
+col1, col2 = st.columns([4,1])
 
 with col1:
     user_input = st.text_input("Ask your question:")
@@ -187,6 +268,8 @@ with col2:
     st.write("")
     st.write("")
     search_btn = st.button("🔍 Search")
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------- IMAGE BUTTON ----------------
 if st.button("🎨 Generate Image"):
@@ -200,9 +283,9 @@ st.markdown("---")
 
 # ---------------- MAIN ----------------
 def run_query(query):
+    mode = st.session_state.get("last_mode", "AI Explanation")
 
     emotion = detect_emotion(query)
-
     if emotion == "NEGATIVE":
         query += " suggest NGOs"
         st.info("💡 Emotion detected → suggesting help")
@@ -238,10 +321,15 @@ def run_query(query):
 
 # ---------------- BUTTON ----------------
 if search_btn and user_input:
+    # Save history
     st.session_state["history"].insert(0, f"{mode}: {user_input}")
     st.session_state["history"] = st.session_state["history"][:10]
-    run_query(user_input)
 
+    # Save query for persistence (IMPORTANT FIX)
+    st.session_state["last_query"] = user_input
+    st.session_state["last_mode"] = mode
+    if "last_query" in st.session_state:
+        run_query(st.session_state["last_query"])
 # ---------------- SIDEBAR ----------------
 st.sidebar.markdown("## 📜 Search History")
 
